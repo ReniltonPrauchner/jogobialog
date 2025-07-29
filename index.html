@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Desafio Bialog na Estrada</title>
+    <title>Desafio Bialog na Estrada V2</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap');
 
@@ -13,6 +13,7 @@
             --road-color: #4a4a4a;
             --line-color: #f0f0f0;
             --grass-color: #3d8b3d;
+            --danger-red: #d9534f;
         }
 
         body {
@@ -26,7 +27,7 @@
             background-color: #f0f2f5;
             font-family: 'Roboto', sans-serif;
             overflow: hidden;
-            touch-action: none; /* Disable browser gestures like pull-to-refresh */
+            touch-action: none;
         }
 
         #gameContainer {
@@ -56,7 +57,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Allow clicks to pass through to canvas unless on a button */
+            pointer-events: none;
         }
         
         #topBar {
@@ -66,31 +67,24 @@
             padding: 15px 20px;
             color: white;
             background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);
-        }
-
-        #timer, #progressContainer {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 700;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
         }
-        
-        #progressContainer {
-            width: 60%;
-            background-color: rgba(255,255,255,0.3);
-            border-radius: 10px;
-            height: 20px;
-            border: 2px solid white;
+
+        #lifeCounter {
+            display: flex;
+            align-items: center;
         }
 
-        #progressBar {
-            width: 0%;
-            height: 100%;
-            background-color: var(--bialog-orange);
-            border-radius: 8px;
-            transition: width 0.2s linear;
+        #lifeCounter svg {
+            width: 30px;
+            height: 30px;
+            fill: var(--danger-red);
+            margin-right: 8px;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
         }
 
-        /* --- STYLES FOR MODAL (POP-UP) --- */
         #modal {
             position: absolute;
             top: 0;
@@ -157,20 +151,33 @@
         
         #controls {
             position: absolute;
-            bottom: 0;
+            bottom: 20px;
             left: 0;
             width: 100%;
-            height: 20%;
             display: flex;
-            pointer-events: all;
+            justify-content: space-around;
+            align-items: center;
             z-index: 10;
+            pointer-events: all;
         }
 
         .control-btn {
-            width: 50%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.2);
-            -webkit-tap-highlight-color: transparent; /* Remove blue highlight on tap */
+            width: 100px;
+            height: 100px;
+            background-color: rgba(255, 255, 255, 0.25);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            color: white;
+            font-weight: bold;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: background-color 0.1s;
+        }
+        .control-btn:active {
+            background-color: rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
@@ -179,24 +186,24 @@
     <div id="gameContainer">
         <div id="uiContainer">
             <div id="topBar">
-                <div id="timer">2:00</div>
-                <div id="progressContainer">
-                    <div id="progressBar"></div>
+                <div id="timer">0:30</div>
+                <div id="lifeCounter">
+                    <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <span id="lifeCount">12</span>
                 </div>
             </div>
 
-            <!-- MODAL STRUCTURE UPDATED -->
             <div id="modal">
                 <div id="modal-content">
-                    <h1>Desafio Bialog</h1>
-                    <p>Desvie dos obstáculos e pegue o Nitro Bialog para ganhar velocidade. Chegue ao destino em menos de 2 minutos para conquistar o Selo de Qualidade!</p>
+                    <h1>Desafio Bialog V2</h1>
+                    <p>Sobreviva por 30 segundos para ganhar o Selo de Qualidade! Você tem 12 vidas. Cuidado com os obstáculos e as estradas esburacadas!</p>
                     <button id="startButton">Começar</button>
                 </div>
             </div>
             
             <div id="controls" class="hidden">
-                <div id="leftControl" class="control-btn"></div>
-                <div id="rightControl" class="control-btn"></div>
+                <div id="leftControl" class="control-btn">&lt;</div>
+                <div id="rightControl" class="control-btn">&gt;</div>
             </div>
         </div>
         <canvas id="gameCanvas"></canvas>
@@ -209,14 +216,13 @@
         const modal = document.getElementById('modal');
         const startButton = document.getElementById('startButton');
         const timerDisplay = document.getElementById('timer');
+        const lifeCountDisplay = document.getElementById('lifeCount');
         const controls = document.getElementById('controls');
-        const progressBar = document.getElementById('progressBar');
 
         let gameRunning = false;
-        let gameTime = 120; // 2 minutes in seconds
+        let gameTime = 30;
+        let lives = 12;
         let timerInterval;
-        let progress = 0;
-        const finishLine = 10000; // Arbitrary distance for the finish line
 
         let truck, roadLines, obstacles, nitros;
 
@@ -224,7 +230,7 @@
         const TRUCK_WIDTH = 50;
         const TRUCK_HEIGHT = 90;
         const TRUCK_SPEED = 7;
-        const ROAD_MARGIN = 0.15; // 15% margin on each side
+        const ROAD_MARGIN = 0.15;
 
         // --- Resize Canvas ---
         function resizeCanvas() {
@@ -242,22 +248,18 @@
                 width: TRUCK_WIDTH,
                 height: TRUCK_HEIGHT,
                 speedX: 0,
-                isImmune: false,
-                immuneTimer: 0,
-                isSlowed: false,
-                slowedTimer: 0,
+                isImmune: false, immuneTimer: 0,
+                isUncontrolled: false, uncontrolledTimer: 0,
                 draw() {
                     ctx.fillStyle = this.isImmune ? '#ffaa00' : '#0055a4';
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 4;
 
-                    // Truck Body
                     ctx.beginPath();
                     ctx.roundRect(this.x - this.width / 2, this.y, this.width, this.height, [10, 10, 0, 0]);
                     ctx.fill();
                     ctx.stroke();
 
-                    // Cabin
                     ctx.fillStyle = '#c0c0c0';
                     ctx.beginPath();
                     ctx.roundRect(this.x - this.width / 2 + 5, this.y + 5, this.width - 10, this.height / 3, [5]);
@@ -272,21 +274,22 @@
                     }
                 },
                 update() {
-                    this.x += this.speedX;
-                    const roadWidth = canvas.width * (1 - 2 * ROAD_MARGIN);
+                    if (this.isUncontrolled) {
+                        this.x += (Math.random() - 0.5) * 15; // Shake effect
+                        this.uncontrolledTimer--;
+                        if (this.uncontrolledTimer <= 0) this.isUncontrolled = false;
+                    } else {
+                        this.x += this.speedX;
+                    }
+
                     const minX = canvas.width * ROAD_MARGIN + this.width / 2;
                     const maxX = canvas.width * (1 - ROAD_MARGIN) - this.width / 2;
-                    
                     if (this.x < minX) this.x = minX;
                     if (this.x > maxX) this.x = maxX;
 
                     if (this.isImmune) {
                         this.immuneTimer--;
                         if (this.immuneTimer <= 0) this.isImmune = false;
-                    }
-                    if (this.isSlowed) {
-                        this.slowedTimer--;
-                        if (this.slowedTimer <= 0) this.isSlowed = false;
                     }
                 }
             };
@@ -296,82 +299,76 @@
         function createRoadLines() {
             let lines = [];
             for (let i = 0; i < 10; i++) {
-                lines.push({
-                    y: i * (canvas.height / 8),
-                    x: canvas.width / 2,
-                    height: 40,
-                    width: 10
-                });
+                lines.push({ y: i * (canvas.height / 8), x: canvas.width / 2, height: 40, width: 10 });
             }
             return lines;
         }
 
         function updateAndDrawRoad() {
-            let gameSpeed = 8;
-            if (truck.isSlowed) gameSpeed = 2;
-            if (truck.isImmune) gameSpeed = 16;
-            
+            let gameSpeed = truck.isImmune ? 16 : 8;
             ctx.fillStyle = '#f0f0f0';
             roadLines.forEach(line => {
                 line.y += gameSpeed;
-                if (line.y > canvas.height) {
-                    line.y = -line.height;
-                }
+                if (line.y > canvas.height) line.y = -line.height;
                 ctx.fillRect(line.x - line.width / 2, line.y, line.width, line.height);
             });
-            
-             // Update progress
-            if (gameRunning) {
-                progress += gameSpeed;
-                progressBar.style.width = `${(progress / finishLine) * 100}%`;
-            }
         }
 
         // --- Obstacles and Nitros ---
         const obstacleTypes = [
-            { name: "Frete Baixo", color: "#d9534f" },
-            { name: "Estrada Esburacada", color: "#777" },
-            { name: "Rota Perigosa", color: "#f0ad4e" }
+            { name: "Frete Baixo", color: "#d9534f", type: 'damage' },
+            { name: "Rota Perigosa", color: "#f0ad4e", type: 'damage' },
+            { name: "Estrada Esburacada", color: "#333", type: 'uncontrol' }
         ];
 
-        function createItem(type) {
+        function createItem(itemType) {
             const roadWidth = canvas.width * (1 - 2 * ROAD_MARGIN);
             const minX = canvas.width * ROAD_MARGIN;
+
+            let details = null;
+            if (itemType === 'obstacle') {
+                details = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+            }
 
             return {
                 x: minX + Math.random() * roadWidth,
                 y: -50,
-                width: 120,
-                height: 40,
+                width: 120, height: 40,
                 speed: 4 + Math.random() * 2,
-                type: type, // 'obstacle' or 'nitro'
-                details: type === 'obstacle' ? obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)] : null,
+                itemType: itemType,
+                details: details,
                 draw() {
-                    ctx.font = "bold 16px Roboto";
-                    const textWidth = ctx.measureText(this.details ? this.details.name : "BIALOG NITRO").width;
-                    this.width = textWidth + 20;
-
-                    if (this.type === 'obstacle') {
+                    if (this.details && this.details.type === 'uncontrol') {
+                        // Draw pothole
                         ctx.fillStyle = this.details.color;
-                    } else { // Nitro
-                        ctx.fillStyle = '#003366'; // Bialog Blue
-                        ctx.strokeStyle = '#ff6600'; // Bialog Orange
-                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.ellipse(this.x, this.y, 60, 20, 0, 0, 2 * Math.PI);
+                        ctx.fill();
+                    } else {
+                        // Draw text box for other items
+                        ctx.font = "bold 16px Roboto";
+                        const text = this.itemType === 'nitro' ? "BIALOG NITRO" : this.details.name;
+                        const textWidth = ctx.measureText(text).width;
+                        this.width = textWidth + 20;
+
+                        ctx.fillStyle = this.itemType === 'nitro' ? '#003366' : this.details.color;
+                        if (this.itemType === 'nitro') {
+                            ctx.strokeStyle = '#ff6600';
+                            ctx.lineWidth = 4;
+                        }
+                        
+                        ctx.beginPath();
+                        ctx.roundRect(this.x - this.width / 2, this.y, this.width, this.height, [20]);
+                        ctx.fill();
+                        if(this.itemType === 'nitro') ctx.stroke();
+                        
+                        ctx.fillStyle = "white";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(text, this.x, this.y + this.height / 2);
                     }
-                    
-                    ctx.beginPath();
-                    ctx.roundRect(this.x - this.width / 2, this.y, this.width, this.height, [20]);
-                    ctx.fill();
-                    if(this.type === 'nitro') ctx.stroke();
-                    
-                    ctx.fillStyle = "white";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(this.details ? this.details.name : "BIALOG NITRO", this.x, this.y + this.height / 2);
                 },
-                update() {
-                    this.y += this.speed;
-                }
+                update() { this.y += this.speed; }
             };
         }
 
@@ -379,57 +376,48 @@
         let nitroSpawnTimer = 0;
 
         function handleItems() {
-            // Spawn new items
             if (obstacleSpawnTimer <= 0) {
                 obstacles.push(createItem('obstacle'));
-                obstacleSpawnTimer = 60 - (progress / finishLine) * 30; // Spawn faster over time
-            } else {
-                obstacleSpawnTimer--;
-            }
+                obstacleSpawnTimer = 50;
+            } else { obstacleSpawnTimer--; }
 
             if (nitroSpawnTimer <= 0) {
                 nitros.push(createItem('nitro'));
-                nitroSpawnTimer = 300 + Math.random() * 200; // Spawn every 5-8 seconds
-            } else {
-                nitroSpawnTimer--;
-            }
+                nitroSpawnTimer = 300 + Math.random() * 200;
+            } else { nitroSpawnTimer--; }
 
-            // Update and draw obstacles
-            obstacles.forEach((obs, index) => {
-                obs.update();
-                obs.draw();
-                if (obs.y > canvas.height) {
-                    obstacles.splice(index, 1);
-                }
-            });
-
-            // Update and draw nitros
-            nitros.forEach((nitro, index) => {
-                nitro.update();
-                nitro.draw();
-                if (nitro.y > canvas.height) {
-                    nitros.splice(index, 1);
-                }
+            [obstacles, nitros].forEach(arr => {
+                arr.forEach((item, index) => {
+                    item.update();
+                    item.draw();
+                    if (item.y > canvas.height) arr.splice(index, 1);
+                });
             });
         }
         
         // --- Collision Detection ---
         function checkCollisions() {
-            // Obstacles
+            if (truck.isImmune) return;
+
             obstacles.forEach((obs, index) => {
-                if (!truck.isImmune && checkRectCollision(truck, obs)) {
+                if (checkRectCollision(truck, obs)) {
+                    if (obs.details.type === 'damage') {
+                        lives--;
+                        updateLifeDisplay();
+                        if (lives <= 0) endGame(false);
+                    } else if (obs.details.type === 'uncontrol') {
+                        truck.isUncontrolled = true;
+                        truck.uncontrolledTimer = 45; // 0.75 seconds of uncontrol
+                    }
                     obstacles.splice(index, 1);
-                    truck.isSlowed = true;
-                    truck.slowedTimer = 60; // Slowed for 1 second
                 }
             });
 
-            // Nitros
             nitros.forEach((nitro, index) => {
                 if (checkRectCollision(truck, nitro)) {
                     nitros.splice(index, 1);
                     truck.isImmune = true;
-                    truck.immuneTimer = 300; // Immune for 5 seconds
+                    truck.immuneTimer = 300; // 5 seconds of immunity
                 }
             });
         }
@@ -446,28 +434,20 @@
         // --- Game Loop ---
         function gameLoop() {
             if (!gameRunning) return;
-            
             handleInput();
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             updateAndDrawRoad();
             handleItems();
             truck.update();
             truck.draw();
             checkCollisions();
-
-            if (progress >= finishLine) {
-                endGame(true);
-            }
-
             requestAnimationFrame(gameLoop);
         }
         
         // --- Game State ---
         function init() {
-            gameTime = 120;
-            progress = 0;
+            gameTime = 30;
+            lives = 12;
             truck = createTruck();
             roadLines = createRoadLines();
             obstacles = [];
@@ -475,7 +455,7 @@
             obstacleSpawnTimer = 0;
             nitroSpawnTimer = 300;
             updateTimerDisplay();
-            progressBar.style.width = '0%';
+            updateLifeDisplay();
         }
         
         function startGame() {
@@ -485,10 +465,11 @@
             controls.classList.remove('hidden');
             
             timerInterval = setInterval(() => {
+                if (!gameRunning) return;
                 gameTime--;
                 updateTimerDisplay();
                 if (gameTime <= 0) {
-                    endGame(false); // Time's up
+                    endGame(true); // Survived!
                 }
             }, 1000);
 
@@ -506,10 +487,10 @@
             
             if (isWin) {
                 modalTitle.textContent = "Parabéns!";
-                modalText.innerHTML = `Você chegou ao destino! <br>🏆 <strong>Selo de Qualidade Bialog Conquistado!</strong> 🏆`;
+                modalText.innerHTML = `Você sobreviveu! <br>🏆 <strong>Selo de Qualidade Bialog Conquistado!</strong> 🏆`;
             } else {
                 modalTitle.textContent = "Fim de Jogo!";
-                modalText.textContent = "O tempo acabou! Tente novamente para garantir a entrega no prazo.";
+                modalText.textContent = "Você ficou sem vidas! Mais sorte na próxima entrega.";
             }
 
             startButton.textContent = "Jogar Novamente";
@@ -517,9 +498,10 @@
         }
 
         function updateTimerDisplay() {
-            const minutes = Math.floor(gameTime / 60);
-            const seconds = gameTime % 60;
-            timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            timerDisplay.textContent = `0:${gameTime.toString().padStart(2, '0')}`;
+        }
+        function updateLifeDisplay() {
+            lifeCountDisplay.textContent = lives;
         }
 
         // --- Controls ---
@@ -535,14 +517,15 @@
 
         leftControl.addEventListener('touchstart', (e) => { e.preventDefault(); touchingLeft = true; });
         leftControl.addEventListener('touchend', (e) => { e.preventDefault(); touchingLeft = false; });
-        leftControl.addEventListener('touchcancel', (e) => { e.preventDefault(); touchingLeft = false; });
         
         rightControl.addEventListener('touchstart', (e) => { e.preventDefault(); touchingRight = true; });
         rightControl.addEventListener('touchend', (e) => { e.preventDefault(); touchingRight = false; });
-        rightControl.addEventListener('touchcancel', (e) => { e.preventDefault(); touchingRight = false; });
 
         function handleInput() {
-            if (!truck) return;
+            if (!truck || truck.isUncontrolled) {
+                if (truck) truck.speedX = 0;
+                return;
+            }
 
             if (touchingLeft || keyState['ArrowLeft']) {
                 truck.speedX = -TRUCK_SPEED;
